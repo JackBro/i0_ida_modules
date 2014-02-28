@@ -25,6 +25,16 @@ static void i0_insert_map(const ea_t* pEA, const char* sym)
 	i0_rev_sym_map[sym] = *pEA;
 }
 
+const std::string* i0_find_sym_by_addr(const ea_t& addr)
+{
+	std::map<ea_t, std::string>::iterator i = i0_sym_map.find(addr);
+	if (i != i0_sym_map.end())
+	{
+		return &(i->second);
+	}
+	return NULL;
+}
+
 static asm_t i0_asm = {
 	AS_COLON,
 	0,

@@ -26,5 +26,6 @@ extern int idaapi i0_notify(processor_t::idp_notify msgid, ...);
 extern std::map<ea_t, std::string> i0_sym_map;
 extern std::map<std::string, ea_t> i0_rev_sym_map;
 extern bool i0_sym_map_file_loaded;
+extern const std::string* i0_find_sym_by_addr(const ea_t&);
 
 #endif

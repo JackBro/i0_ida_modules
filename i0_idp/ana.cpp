@@ -177,6 +177,26 @@ public:
 
 #pragma pack(pop)
 
+static inline bool i0_is_0sp(const op_t& op)
+{
+	return ((op.dtyp == dt_qword) && (op.type == i0_o_regdispl) && (op.reg == i0_reg_SP) && (op.value == 0));
+}
+
+static inline bool i0_promote_to_dircode(op_t& op)
+{
+	if ((op.type == i0_o_imm) && (op.dtyp == dt_qword))
+	{
+		op.addr = op.value;
+		op.flags &= (~OF_NUMBER);
+		op.type = i0_o_dir_code;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
 static uint16 fill_oper(uint32 i0_oper_attr, uint32 i0_oper_addrm, uint16 cmd_offset, bool is_code_ref, op_t& operand)
 {
 	operand.offb = ((uchar)cmd_offset);
@@ -191,7 +211,6 @@ static uint16 fill_oper(uint32 i0_oper_attr, uint32 i0_oper_addrm, uint16 cmd_of
 	case i0_addrm_Imm:
 		if (is_code_ref)
 		{
-			assert(i0_oper_attr == i0_attr_ue);
 			operand.type = i0_o_dir_code;
 			operand.addr = ua_next_qword();
 			return i0_attr_byte_len[i0_attr_ue];
@@ -312,6 +331,10 @@ i0_ana(void)
 		CHK_I0_ADDRM_M(oper2_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
 		fill_oper(oper1_attr, oper1_addrm, cmd.size, false, cmd.Op1);
 		fill_oper(oper2_attr, oper2_addrm, cmd.size, false, cmd.Op2);
+		if (i0_is_0sp(cmd.Op2))
+		{
+			i0_promote_to_dircode(cmd.Op1);
+		}
 		return cmd.size;
 	case I0_OPCODE_ADD:
 		cmd.itype = I0_ins_add;
