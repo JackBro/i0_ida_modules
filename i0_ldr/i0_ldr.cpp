@@ -85,7 +85,7 @@ void idaapi i0_load_file(linput_t *li, ushort neflag, const char *fileformatname
 		}
 		msg("i0 .text segment addressing mode set to 64bit\n");
 		create_filename_cmt();
-		add_entry(I0_MEMSPACE_PROGLOAD_BASE, I0_MEMSPACE_PROGLOAD_BASE,NULL, true);
+		add_entry(I0_MEMSPACE_PROGLOAD_BASE, I0_MEMSPACE_PROGLOAD_BASE,"i0_entry", true);
 		msg("i0 program file successfully loaded\n");
 
 		linput_type_t i0_file_type = get_linput_type(li);

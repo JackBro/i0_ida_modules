@@ -53,7 +53,10 @@ int idaapi i0_emu(void)
 				}
 				break;
 			case i0_sym_local:
-				set_name(cmd.ea, i->second.first.c_str(), SN_LOCAL);
+				if (!set_name(cmd.ea, i->second.first.c_str(), SN_LOCAL | SN_NOWARN))
+				{
+					set_name(cmd.ea, i->second.first.c_str(), SN_PUBLIC);
+				}
 				break;
 			}
 		}
