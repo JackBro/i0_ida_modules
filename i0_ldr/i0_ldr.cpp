@@ -3,6 +3,7 @@
 #pragma warning(pop)
 #include <i0_ida_common/i0_ida_spec.h>
 #include <i0_ida_common/i0_mem_layout.h>
+#include <i0_ida_common/i0_ida_common_lib.h>
 #include <fstream>
 #include <string>
 
@@ -25,7 +26,7 @@ int idaapi i0_accept_file(linput_t *li, char fileformatname[MAX_FILE_FORMAT_NAME
 	return 0;
 }
 
-static void i0_parse_map_file(std::istream& input)
+static void i0_parse_map_file(std::istream& input, segment_t* seg)
 {
 	input >> std::hex;
 	ea_t addr;
@@ -33,7 +34,23 @@ static void i0_parse_map_file(std::istream& input)
 	while (input >> addr >> sym)
 	{
 		msg("i0_sym: %llx \t%s\n", addr, sym.c_str());
-		ph.notify(processor_t::loader, i0_loader_req_insert_sym, &addr, sym.c_str());
+		I0_SYM_TYPE sym_type;
+		if (seg->contains(addr))
+		{
+			if (i0_func_probe(addr))
+			{
+				sym_type = i0_sym_func;
+			}
+			else
+			{
+				sym_type = i0_sym_local;
+			}
+		}
+		else
+		{
+			sym_type = i0_sym_data;
+		}
+		ph.notify(processor_t::loader, i0_loader_req_insert_sym, &addr, sym.c_str(), sym_type);
 	}
 }
 
@@ -68,7 +85,7 @@ void idaapi i0_load_file(linput_t *li, ushort neflag, const char *fileformatname
 		}
 		msg("i0 .text segment addressing mode set to 64bit\n");
 		create_filename_cmt();
-		add_entry(I0_MEMSPACE_PROGLOAD_BASE, I0_MEMSPACE_PROGLOAD_BASE,"i0 entry", true);
+		add_entry(I0_MEMSPACE_PROGLOAD_BASE, I0_MEMSPACE_PROGLOAD_BASE,NULL, true);
 		msg("i0 program file successfully loaded\n");
 
 		linput_type_t i0_file_type = get_linput_type(li);
@@ -87,8 +104,8 @@ void idaapi i0_load_file(linput_t *li, ushort neflag, const char *fileformatname
 			{
 				msg("possible map file %s\n", map_file_path);
 				ph.notify(processor_t::loader, i0_loader_req_init_symtable);
-				i0_parse_map_file(i0_map_file);
-				ph.notify(processor_t::loader, i0_loader_req_insert_sym, &i0_code_segment_end, "__i0_text_end");
+				i0_parse_map_file(i0_map_file, text_seg);
+				ph.notify(processor_t::loader, i0_loader_req_insert_sym, &i0_code_segment_end, "__i0_text_end", i0_sym_func);
 				ph.notify(processor_t::loader, i0_loader_req_finish_symtable);
 			}
 		}

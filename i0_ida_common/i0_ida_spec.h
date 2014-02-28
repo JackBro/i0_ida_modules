@@ -11,4 +11,11 @@ enum I0_LDR_IDP_notify{
 	i0_loader_req_finish_symtable
 };
 
+enum I0_SYM_TYPE{
+	i0_sym_none,
+	i0_sym_func,
+	i0_sym_local,
+	i0_sym_data,
+};
+
 #endif

@@ -8,11 +8,11 @@
 static bool i0_out_imm_ui_sb(op_t& op){ return !OutValue(op, OOF_SIGNED | OOF_NUMBER | OOFW_IMM | OOFW_8); }
 static bool i0_out_imm_ui_se(op_t& op)
 {
-	const std::string* sym = i0_find_sym_by_addr(op.value);
-	if (sym != NULL)
+	const i0_sym_entry_t* sym_ent = i0_find_sym_by_addr(op.value);
+	if (sym_ent != NULL)
 	{
 		OutChar('&');
-		out_line(sym->c_str(), COLOR_DREF);
+		out_line(sym_ent->first.c_str(), COLOR_DREF);
 		return true;
 	}
 	return !OutValue(op, OOF_SIGNED | OOF_NUMBER | OOFW_IMM | OOFW_64);
@@ -22,11 +22,11 @@ static bool i0_out_imm_ui_sf(op_t& op){ return !OutValue(op, OOF_SIGNED | OOF_NU
 static bool i0_out_imm_ui_ub(op_t& op){ return !OutValue(op, OOFS_IFSIGN | OOF_NUMBER | OOFW_IMM | OOFW_8); }
 static bool i0_out_imm_ui_ue(op_t& op)
 {
-	const std::string* sym = i0_find_sym_by_addr(op.value);
-	if (sym != NULL)
+	const i0_sym_entry_t* sym_ent = i0_find_sym_by_addr(op.value);
+	if (sym_ent != NULL)
 	{
 		OutChar('&');
-		out_line(sym->c_str(), COLOR_DREF);
+		out_line(sym_ent->first.c_str(), COLOR_DREF);
 		return true;
 	}
 	return !OutValue(op, OOFS_IFSIGN | OOF_NUMBER | OOFW_IMM | OOFW_64);
@@ -80,10 +80,10 @@ inline static bool i0_ouput_addr_ui_try_sym(op_t& op, color_t color)
 {
 	if (!out_name_expr(op, op.addr, op.addr))
 	{
-		const std::string* sym = i0_find_sym_by_addr(op.addr);
-		if (sym != NULL)
+		const i0_sym_entry_t* sym_ent = i0_find_sym_by_addr(op.addr);
+		if (sym_ent != NULL)
 		{
-			out_line(sym->c_str(), color);
+			out_line(sym_ent->first.c_str(), color);
 			return true;
 		}
 		return false;
@@ -111,10 +111,10 @@ inline static bool i0_output_addrcode_ui(op_t& op)
 
 inline static bool i0_output_addr_console(op_t& op)
 {
-	const std::string* sym = i0_find_sym_by_addr(op.addr);
-	if (sym)
+	const i0_sym_entry_t* sym_ent = i0_find_sym_by_addr(op.addr);
+	if (sym_ent)
 	{
-		msg("%s", sym->c_str());
+		msg("%s", sym_ent->first.c_str());
 	}
 	else
 	{

@@ -4,6 +4,7 @@
 #pragma warning(push, 3)
 #include "../idaidp.hpp"
 #pragma warning(pop)
+#include <i0_ida_common\i0_ida_spec.h>
 #include <map>
 #include <string>
 
@@ -23,9 +24,12 @@ extern void idaapi i0_data(ea_t addr);
 extern bool idaapi i0_cmp_opnd(const op_t&, const op_t&);
 extern int idaapi i0_notify(processor_t::idp_notify msgid, ...);
 
-extern std::map<ea_t, std::string> i0_sym_map;
-extern std::map<std::string, ea_t> i0_rev_sym_map;
+typedef std::pair<std::string, I0_SYM_TYPE> i0_sym_entry_t;
+typedef std::map<ea_t, i0_sym_entry_t> i0_sym_map_t;
+typedef i0_sym_map_t::iterator i0_sym_map_iterator_t;
+
+extern i0_sym_map_t i0_sym_map;
 extern bool i0_sym_map_file_loaded;
-extern const std::string* i0_find_sym_by_addr(const ea_t&);
+extern const i0_sym_entry_t* i0_find_sym_by_addr(const ea_t&);
 
 #endif

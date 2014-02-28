@@ -5,13 +5,14 @@
 #include <fstream>
 #include <string>
 
+
 /*static void TouchArg(const op_t& op, bool is_read)
 {
-	(void)is_read;
-	if (op.type == i0_o_dir_code)
-	{
-		ua_add_cref(op.offb, op.addr, fl_JN);
-	}
+(void)is_read;
+if (op.type == i0_o_dir_code)
+{
+ua_add_cref(op.offb, op.addr, fl_JN);
+}
 }*/
 
 static void i0_touch_arg_cref(const op_t& op)
@@ -29,21 +30,33 @@ int idaapi i0_emu(void)
 #endif
 	if (i0_sym_map_file_loaded)
 	{
-		std::map<ea_t,std::string>::iterator i = i0_sym_map.find(cmd.ea);
+		i0_sym_map_iterator_t i = i0_sym_map.find(cmd.ea);
 		if (i != i0_sym_map.end())
 		{
-			set_name(cmd.ea, i->second.c_str());
-			++i;
-			if (i != i0_sym_map.end())
+			switch (i->second.second)
 			{
-				add_func(cmd.ea, i->first);
-			}
-			else
-			{
-				//problem!
+			case i0_sym_func:
+				set_name(cmd.ea, i->second.first.c_str(), SN_PUBLIC);
+				for (;;)
+				{
+					++i;
+					if (i == i0_sym_map.end())
+					{
+						assert(0);
+						break;
+					}
+					if (i->second.second == i0_sym_func)
+					{
+						add_func(cmd.ea, i->first);
+						break;
+					}
+				}
+				break;
+			case i0_sym_local:
+				set_name(cmd.ea, i->second.first.c_str(), SN_LOCAL);
+				break;
 			}
 		}
-
 	}
 	uint32 cmd_feature = cmd.get_canon_feature();
 	/*if (cmd_feature & CF_USE1){ TouchArg(cmd.Op1, 1); }

@@ -5,8 +5,7 @@
 static /*const*/ char* i0_shnames[] = { I0_IDA_SHORT_NAME, NULL };
 static /*const*/ char* i0_lnames[] = { I0_IDA_LONG_NAME, NULL };
 
-std::map<ea_t, std::string> i0_sym_map;
-std::map<std::string, ea_t> i0_rev_sym_map;
+i0_sym_map_t i0_sym_map;
 bool i0_sym_map_file_loaded = false;
 
 //TODO: i0 assembler
@@ -15,19 +14,17 @@ bool i0_sym_map_file_loaded = false;
 static void i0_init_map()
 {
 	i0_sym_map.clear();
-	i0_rev_sym_map.clear();
 	i0_sym_map_file_loaded = true;
 }
 
-static void i0_insert_map(const ea_t* pEA, const char* sym)
+static void i0_insert_map(const ea_t* pEA, const char* sym, I0_SYM_TYPE sym_type)
 {
-	i0_sym_map[*pEA] = sym;
-	i0_rev_sym_map[sym] = *pEA;
+	i0_sym_map[*pEA] = i0_sym_entry_t(std::string(sym), sym_type);
 }
 
-const std::string* i0_find_sym_by_addr(const ea_t& addr)
+const i0_sym_entry_t* i0_find_sym_by_addr(const ea_t& addr)
 {
-	std::map<ea_t, std::string>::iterator i = i0_sym_map.find(addr);
+	i0_sym_map_iterator_t i = i0_sym_map.find(addr);
 	if (i != i0_sym_map.end())
 	{
 		return &(i->second);
@@ -113,7 +110,8 @@ int idaapi i0_notify(processor_t::idp_notify msgid, ...)
 		{
 			const ea_t* pEA = va_arg(va, const ea_t*);
 			const char* sym = va_arg(va, const char*);
-			i0_insert_map(pEA, sym);
+			I0_SYM_TYPE type = va_arg(va, I0_SYM_TYPE);
+			i0_insert_map(pEA, sym, type);
 		}
 			break;
 		case i0_loader_req_finish_symtable:

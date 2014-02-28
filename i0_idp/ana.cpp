@@ -14,7 +14,7 @@ static uint64 i0_nxt_byte16_wrapper(void){ /*NOT IMPLEMENTED*/ ua_next_qword(); 
 
 typedef uint64(*ua_nxt_ptr)(void);
 
-static int trans_to_i0_reg(uint64 addr)
+static int trans_to_i0_reg(const uint64& addr)
 {
 	if ((addr >= I0_MEMSPACE_REGFILE_BASE) && (addr <= I0_MEMSPACE_REGFILE_LIMIT) && (!(addr & 7)))
 	{
