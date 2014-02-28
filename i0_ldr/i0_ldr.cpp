@@ -42,6 +42,7 @@ void idaapi i0_load_file(linput_t *li, ushort neflag, const char *fileformatname
 	int32 file_size = qlsize(li);
 	(void)neflag;
 	(void)fileformatname;
+	ea_t i0_code_segment_end;
 	if (ph.id != I0_IDA_LPH_ID)
 	{
 		char* proc_module_path = set_processor_type(I0_IDA_SHORT_NAME, SETPROC_ALL | SETPROC_FATAL);
@@ -49,7 +50,8 @@ void idaapi i0_load_file(linput_t *li, ushort neflag, const char *fileformatname
 	}
 	if ((file_size > 0) && (((unsigned)file_size) < I0_MEMSPACE_PROGLOAD_SIZE))
 	{
-		if (!file2base(li, 0, I0_MEMSPACE_PROGLOAD_BASE, (I0_MEMSPACE_PROGLOAD_BASE + ((unsigned)file_size)), FILEREG_PATCHABLE))
+		i0_code_segment_end = (I0_MEMSPACE_PROGLOAD_BASE + ((unsigned)file_size));
+		if (!file2base(li, 0, I0_MEMSPACE_PROGLOAD_BASE, i0_code_segment_end, FILEREG_PATCHABLE))
 		{
 			loader_failure("load file to database failed!\n");
 		}
@@ -86,6 +88,7 @@ void idaapi i0_load_file(linput_t *li, ushort neflag, const char *fileformatname
 				msg("possible map file %s\n", map_file_path);
 				ph.notify(processor_t::loader, i0_loader_req_init_symtable);
 				i0_parse_map_file(i0_map_file);
+				ph.notify(processor_t::loader, i0_loader_req_insert_sym, &i0_code_segment_end, "__i0_text_end");
 				ph.notify(processor_t::loader, i0_loader_req_finish_symtable);
 			}
 		}

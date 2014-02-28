@@ -4,6 +4,8 @@
 #pragma warning(push, 3)
 #include "../idaidp.hpp"
 #pragma warning(pop)
+#include <map>
+#include <string>
 
 extern void idaapi i0_header(void);
 extern void idaapi i0_footer(void);
@@ -20,5 +22,9 @@ extern bool idaapi i0_outop_console(op_t& op);
 extern void idaapi i0_data(ea_t addr);
 extern bool idaapi i0_cmp_opnd(const op_t&, const op_t&);
 extern int idaapi i0_notify(processor_t::idp_notify msgid, ...);
+
+extern std::map<ea_t, std::string> i0_sym_map;
+extern std::map<std::string, ea_t> i0_rev_sym_map;
+extern bool i0_sym_map_file_loaded;
 
 #endif

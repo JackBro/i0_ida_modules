@@ -1,15 +1,13 @@
 #include "i0.h"
 #include "ins.hpp"
 #include <i0_ida_common/i0_ida_spec.h>
-#include <map>
-#include <string>
 
 static /*const*/ char* i0_shnames[] = { I0_IDA_SHORT_NAME, NULL };
 static /*const*/ char* i0_lnames[] = { I0_IDA_LONG_NAME, NULL };
 
-static std::map<ea_t, std::string> i0_sym_map;
-static std::map<std::string, ea_t> i0_rev_sym_map;
-static bool i0_has_sym_map_file = false;
+std::map<ea_t, std::string> i0_sym_map;
+std::map<std::string, ea_t> i0_rev_sym_map;
+bool i0_sym_map_file_loaded = false;
 
 //TODO: i0 assembler
 /*static asm_t i0_asm = {};*/
@@ -18,7 +16,7 @@ static void i0_init_map()
 {
 	i0_sym_map.clear();
 	i0_rev_sym_map.clear();
-	i0_has_sym_map_file = true;
+	i0_sym_map_file_loaded = true;
 }
 
 static void i0_insert_map(const ea_t* pEA, const char* sym)
