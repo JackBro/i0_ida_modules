@@ -15,6 +15,28 @@ ua_add_cref(op.offb, op.addr, fl_JN);
 }
 }*/
 
+
+int idaapi i0_is_align_ins(ea_t)
+{
+	return 0;
+}
+
+int idaapi i0_is_sp_based(const op_t& op)
+{
+	if (op.type == i0_o_regdispl)
+	{
+		if (op.reg == i0_reg_BP)
+		{
+			return OP_FP_BASED;
+		}
+		else if (op.reg == i0_reg_SP)
+		{
+			return OP_SP_BASED;
+		}
+	}
+	return 0;
+}
+
 static void i0_touch_arg_cref(const op_t& op)
 {
 	if (op.type == i0_o_dir_code)
@@ -55,6 +77,7 @@ int idaapi i0_emu(void)
 			case i0_sym_local:
 				if (!set_name(cmd.ea, i->second.first.c_str(), SN_LOCAL | SN_NOWARN))
 				{
+					i->second.second = i0_sym_func;
 					set_name(cmd.ea, i->second.first.c_str(), SN_PUBLIC);
 				}
 				break;

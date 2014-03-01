@@ -50,15 +50,15 @@ static asm_t i0_asm = {
 	".ascii",     // ascii string directive
 	".byte",      // byte directive
 	".word",      // word directive
-	NULL,         // dword  (4 bytes)
-	NULL,         // qword  (8 bytes)
-	NULL,         // oword  (16 bytes)
-	NULL,         // float  (4 bytes)
-	NULL,         // double (8 bytes)
+	".dword",     // dword  (4 bytes)
+	".qword",     // qword  (8 bytes)
+	".oword",     // oword  (16 bytes)
+	".float",     // float  (4 bytes)
+	".double",    // double (8 bytes)
 	NULL,         // tbyte  (10/12 bytes)
 	NULL,         // packed decimal real
 	NULL,         // arrays (#h,#d,#v,#s(...)
-	".block %s",  // uninited arrays
+	".bss %s",  // uninited arrays
 	".equ",       // Equ
 	NULL,         // seg prefix
 	//  preline, NULL, operdim,
@@ -203,9 +203,14 @@ processor_t LPH =
 	NULL,                 // int (*is_switch)(switch_info_t *si);
 	NULL,                 // int32 (*gen_map_file)(FILE *fp);
 	NULL,                 // ea_t (*extract_address)(ea_t ea,const char *string,int x);
-	NULL,                 // int (*is_sp_based)(op_t &x); -- always, so leave it NULL
+	i0_is_sp_based,                 // int (*is_sp_based)(op_t &x);
 	NULL,                 // int (*create_func_frame)(func_t *pfn);
 	NULL,                 // int (*get_frame_retsize(func_t *pfn)
 	NULL,                 // void (*gen_stkvar_def)(char *buf,const member_t *mptr,int32 v);
 	gen_spcdef,           // Generate text representation of an item in a special segment
+	I0_ins_bij,
+	NULL,
+	i0_is_align_ins,
+	NULL,
+	0
 };

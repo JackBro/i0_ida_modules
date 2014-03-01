@@ -22,6 +22,8 @@ extern bool idaapi i0_outop_ui(op_t& op);
 extern bool idaapi i0_outop_console(op_t& op);
 extern void idaapi i0_data(ea_t addr);
 extern bool idaapi i0_cmp_opnd(const op_t&, const op_t&);
+extern int idaapi i0_is_align_ins(ea_t ea);
+extern int idaapi i0_is_sp_based(const op_t& op);
 extern int idaapi i0_notify(processor_t::idp_notify msgid, ...);
 
 typedef std::pair<std::string, I0_SYM_TYPE> i0_sym_entry_t;
