@@ -465,7 +465,7 @@ i0_ana(void)
 		return cmd.size;
 	case I0_OPCODE_INT:
 		cmd.itype = I0_ins_int;
-		curr_i0_ins.load(I0_OPCODE_INT);
+		curr_i0_ins.load(I0_INS_LEN_INT);
 		fill_oper(i0_attr_ub, i0_addrm_Imm, cmd.size, false, cmd.Op1);
 		return cmd.size;
 	case I0_OPCODE_SHIFT:
