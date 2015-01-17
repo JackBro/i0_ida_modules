@@ -2,7 +2,7 @@
 #define I0_IDA_SPEC_H
 
 #define I0_IDA_LPH_ID	(0x8001U)
-#define I0_IDA_SHORT_NAME	"i0"//"Z8"//fake IDA
+#define I0_IDA_SHORT_NAME	"i0"
 #define I0_IDA_LONG_NAME	"l0sys VPC i0"
 
 enum I0_LDR_IDP_notify{

@@ -1,3 +1,5 @@
+#define USE_STANDARD_FILE_FUNCTIONS
+
 #pragma warning(push, 3)
 #include "../idaldr.h"
 #pragma warning(pop)

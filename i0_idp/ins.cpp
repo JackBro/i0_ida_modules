@@ -1,7 +1,3 @@
-#pragma warning(push, 3)
-#include "../idaidp.hpp"
-#pragma warning(pop)
-
 #include "ins.hpp"
 
 const char* i0_RegNames[] = {

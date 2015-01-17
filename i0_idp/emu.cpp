@@ -2,9 +2,7 @@
 #include "ana.h"
 #include "ins.hpp"
 #include <frame.hpp>
-#include <fstream>
 #include <string>
-
 
 /*static void TouchArg(const op_t& op, bool is_read)
 {
@@ -14,7 +12,6 @@ if (op.type == i0_o_dir_code)
 ua_add_cref(op.offb, op.addr, fl_JN);
 }
 }*/
-
 
 int idaapi i0_is_align_ins(ea_t)
 {

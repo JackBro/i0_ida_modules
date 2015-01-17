@@ -1,9 +1,7 @@
 #ifndef INS_HPP
 #define INS_HPP
 
-#pragma warning(push, 3)
-#include "../idaidp.hpp"
-#pragma warning(pop)
+#include "i0.h"
 
 extern instruc_t i0_Instructions[];
 extern unsigned i0_Ins_Opnd_Cnt[];
