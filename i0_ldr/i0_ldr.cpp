@@ -35,23 +35,27 @@ static void i0_parse_map_file(std::istream& input, segment_t* seg)
 	std::string sym;
 	while (input >> addr >> sym)
 	{
-		msg("i0_sym: %llx \t%s\n", addr, sym.c_str());
+		msg("i0_sym: %llx \t%s: ", addr, sym.c_str());
 		I0_SYM_TYPE sym_type;
 		if (seg->contains(addr))
 		{
 			if (i0_func_probe(addr))
 			{
 				sym_type = i0_sym_func;
+				msg("[func]");
 			}
 			else
 			{
 				sym_type = i0_sym_local;
+				msg("[local]");
 			}
 		}
 		else
 		{
 			sym_type = i0_sym_data;
+			msg("[data]");
 		}
+		msg("\n");
 		ph.notify(processor_t::loader, i0_loader_req_insert_sym, &addr, sym.c_str(), sym_type);
 	}
 }
