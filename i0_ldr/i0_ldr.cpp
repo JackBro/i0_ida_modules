@@ -35,7 +35,11 @@ static void i0_parse_map_file(std::istream& input, segment_t* seg)
 	std::string sym;
 	while (input >> addr >> sym)
 	{
-		msg("i0_sym: %llx \t%s: ", addr, sym.c_str());
+		if (sym == "main")
+		{
+			sym = "__main";
+		}
+		msg("i0_sym: %011llx %s: ", addr, sym.c_str());
 		I0_SYM_TYPE sym_type;
 		if (seg->contains(addr))
 		{

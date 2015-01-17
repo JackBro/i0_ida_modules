@@ -23,7 +23,7 @@ bool i0_check_byte_seq(ea_t addr, void* byte_seq, asize_t size)
 	}
 	while (size)
 	{
-		uint64* seq_ptr_byte = (uint64*)byte_seq;
+		uint8* seq_ptr_byte = (uint8*)byte_seq;
 		if (get_byte(addr) != (*seq_ptr_byte))
 		{
 			return false;
