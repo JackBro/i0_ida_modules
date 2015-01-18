@@ -29,17 +29,10 @@ const char* i0_ins_attr_suffix[] = {
 }; static_assert((qnumber(i0_ins_attr_suffix) == i0_attr_last), "i0 ins suffix number illegal");
 
 const char* i0_ins_options[] = {
-	"le",
-	"l",
-	"e",
-	"ne",
-	"sl",
 	":c",
 	":a",
 	":cd",
 	":ad",
-	"z",
-	"nz"
 }; static_assert((qnumber(i0_ins_options) == i0_ins_opt_pref_last), "i0 ins option numbers illegal");
 
 instruc_t i0_Instructions[] = {
@@ -54,8 +47,13 @@ instruc_t i0_Instructions[] = {
 	{ "spawn", CF_USE1 | CF_USE2 | CF_USE3 | CF_USE4 | CF_CALL },
 	{ "spawnx", CF_USE1 | CF_USE2 | CF_USE3 | CF_USE4 | CF_USE5 | CF_CALL },
 	{ "exit", CF_STOP },
-	{ "b", CF_USE1 | CF_USE2 | CF_USE3 | CF_JUMP }, //bcc
-	{ "b", CF_USE1 | CF_USE2 | CF_JUMP }, //bcz
+	{ "ble", CF_USE1 | CF_USE2 | CF_USE3 | CF_JUMP },
+	{ "be", CF_USE1 | CF_USE2 | CF_USE3 | CF_JUMP },
+	{ "bl", CF_USE1 | CF_USE2 | CF_USE3 | CF_JUMP },
+	{ "bne", CF_USE1 | CF_USE2 | CF_USE3 | CF_JUMP },
+	{ "bsl", CF_USE1 | CF_USE2 | CF_USE3 | CF_JUMP },
+	{ "bz", CF_USE1 | CF_USE2 | CF_JUMP },
+	{ "bnz", CF_USE1 | CF_USE2 | CF_JUMP },
 	{ "bj", CF_USE1 | CF_JUMP | CF_STOP },
 	{ "bij", CF_USE1 | CF_JUMP | CF_STOP },
 	{ "nop", 0 },
@@ -80,8 +78,13 @@ unsigned i0_Ins_Opnd_Cnt[] =
 	4, //spawn
 	5, //spawnx
 	0, //exit
-	3, //bcc
-	2, //bcz
+	3, //ble
+	3, //be
+	3, //bl
+	3, //bne
+	3, //bsl
+	2, //bz
+	2, //bnz
 	1, //bj
 	1, //bij
 	0, //nop

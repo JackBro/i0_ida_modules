@@ -20,7 +20,7 @@ int idaapi i0_is_align_ins(ea_t)
 
 int idaapi i0_is_sp_based(const op_t& op)
 {
-	if (op.type == i0_o_regdispl)
+	if (op.type == i0_o_reg_displ)
 	{
 		if (op.reg == i0_reg_BP)
 		{

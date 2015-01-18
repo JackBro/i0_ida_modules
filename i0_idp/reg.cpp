@@ -181,9 +181,9 @@ processor_t LPH =
 	NULL,                 // Register descriptions
 	NULL,                 // Pointer to CPU registers
 
-	i0_reg_rVcs, i0_reg_rVds,
+	0, 0,//i0_reg_rVcs, i0_reg_rVds,
 	0,                    // size of a segment register
-	i0_reg_rVcs, i0_reg_rVds,
+	0, 0,//i0_reg_rVcs, i0_reg_rVds,
 
 	NULL,                 // No known code start sequences
 	NULL,
@@ -214,3 +214,14 @@ processor_t LPH =
 	NULL,
 	0
 };
+
+#include <Windows.h>
+
+BOOL WINAPI I064_DllMain(
+	_In_  HINSTANCE hinstDLL,
+	_In_  DWORD fdwReason,
+	_In_  LPVOID lpvReserved
+	)
+{
+	return TRUE;
+}
