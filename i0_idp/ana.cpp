@@ -4,22 +4,15 @@
 #include "ana.h"
 #include <i0_ida_common/i0_mem_layout.h>
 
-static uint64 i0_nxt_byte_wrapper_u(void){ return ((uint8)ua_next_byte()); }
-static uint64 i0_nxt_dword_wrapper_u(void){ return ((uint32)ua_next_long()); }
-static uint64 i0_nxt_qword_wrapper_u(void){ return ua_next_qword(); }
-static uint64 i0_nxt_byte_wrapper_s(void){ return (int64)((int8)ua_next_byte()); }
-static uint64 i0_nxt_dword_wrapper_s(void){ return (int64)((int32)ua_next_long()); }
-static uint64 i0_nxt_qword_wrapper_s(void){ return ua_next_qword(); }
-static uint64 i0_nxt_byte16_wrapper(void){ /*NOT IMPLEMENTED*/ ua_next_qword(); ua_next_qword(); return ((uint64)(-1LL)); }
-
-typedef uint64(*ua_nxt_ptr)(void);
-
-static int trans_to_i0_reg(const uint64& addr)
+static bool trans_to_i0_reg(uint64 addr, uint16& reg)
 {
-	if ((addr >= I0_MEMSPACE_REGFILE_BASE) && (addr <= I0_MEMSPACE_REGFILE_LIMIT) && (!(addr & 7)))
+	if ((addr >= I0_MEMSPACE_REGFILE_BASE) 
+		&& (addr <= I0_MEMSPACE_REGFILE_LIMIT) 
+		&& (!(addr % sizeof(uint64))))
 	{
-		return i0_reg_BP + (((unsigned)(addr - I0_MEMSPACE_REGFILE_BASE)) / 8);
+		reg = i0_reg_BP + (((unsigned)(addr - I0_MEMSPACE_REGFILE_BASE)) / 8U);
 	}
+	/*
 	switch (addr)
 	{
 	case I0_MEMSPACE_STDIN:
@@ -38,9 +31,21 @@ static int trans_to_i0_reg(const uint64& addr)
 		return i0_reg_rr_fi;
 	case I0_MEMSPACE_CURRENT_TASK_ID:
 		return i0_reg_rr_ID;
-	}
-	return -1;
+	}*/
+	return false;
 }
+
+
+static uint64 i0_nxt_byte_wrapper_u(void){ return ((uint8)ua_next_byte()); }
+static uint64 i0_nxt_dword_wrapper_u(void){ return ((uint32)ua_next_long()); }
+static uint64 i0_nxt_qword_wrapper_u(void){ return ua_next_qword(); }
+static uint64 i0_nxt_byte_wrapper_s(void){ return (int64)((int8)ua_next_byte()); }
+static uint64 i0_nxt_dword_wrapper_s(void){ return (int64)((int32)ua_next_long()); }
+static uint64 i0_nxt_qword_wrapper_s(void){ return ua_next_qword(); }
+static uint64 i0_nxt_byte16_wrapper(void){ /*NOT IMPLEMENTED*/ ua_next_qword(); ua_next_qword(); return ((uint64)(-1LL)); }
+
+typedef uint64(*ua_nxt_ptr)(void);
+
 
 static ua_nxt_ptr ua_nxt_attr[] = {
 	i0_nxt_byte_wrapper_s,
@@ -82,6 +87,8 @@ static const uint16 i0_attr_byte_len[] =
 	4U,
 	8U
 }; static_assert((qnumber(i0_attr_byte_len) == i0_attr_last), "check i0_attr_byte_len");
+
+#include "i0_instr.cpp"
 
 static inline bool is_valid_oper_attr(uint32 attr)
 {
@@ -154,7 +161,7 @@ private:
 			--cnt;
 		}
 	}
-	i0_ins& operator=(const i0_ins&);
+	i0_ins& operator=(const i0_ins&) = default;
 public:
 	i0_ins(insn_t& cmd_ref) : insn_ref(cmd_ref), shift_cnt(0){
 		load_bytes(I0_INS_LEN_OPCODE);
@@ -179,7 +186,7 @@ public:
 
 static inline bool i0_is_0sp(const op_t& op)
 {
-	return ((op.dtyp == dt_qword) && (op.type == i0_o_regdispl) && (op.reg == i0_reg_SP) && (op.value == 0));
+	return ((op.dtyp == dt_qword) && (op.type == i0_o_reg_displ) && (op.reg == i0_reg_SP) && (op.value == 0));
 }
 
 static inline bool i0_promote_to_dircode(op_t& op)
@@ -199,13 +206,13 @@ static inline bool i0_promote_to_dircode(op_t& op)
 
 static uint16 fill_oper(uint32 i0_oper_attr, uint32 i0_oper_addrm, uint16 cmd_offset, bool is_code_ref, op_t& operand)
 {
-	operand.offb = ((uchar)cmd_offset);
+	operand.offb = ((uint8)cmd_offset);
 	operand.dtyp = i0_attr_to_ida_type[i0_oper_attr];
-	operand.i0_op_spec_attr = ((uchar)i0_oper_attr);
-	operand.i0_op_spec_addrm = ((uchar)i0_oper_addrm);
+	operand.i0_op_spec_attr = ((uint8)i0_oper_attr);
+	operand.i0_op_spec_addrm = ((uint8)i0_oper_addrm);
 	int32 disp = 0;
 	uint64 mem = 0;
-	int reg;
+	uint16 reg = -1;
 	switch (i0_oper_addrm)
 	{
 	case i0_addrm_Imm:
@@ -226,11 +233,11 @@ static uint16 fill_oper(uint32 i0_oper_attr, uint32 i0_oper_addrm, uint16 cmd_of
 		disp = ua_next_long();
 	default:
 		mem = ua_next_qword();
-		reg = trans_to_i0_reg(mem);
+		trans_to_i0_reg(mem, reg);
 	}
 	if (i0_oper_addrm == i0_addrm_Abs)
 	{
-		if (reg >= 0)
+		if (reg != -1)
 		{
 			operand.reg = (uint16)reg;
 			operand.type = i0_o_reg;
@@ -242,17 +249,17 @@ static uint16 fill_oper(uint32 i0_oper_attr, uint32 i0_oper_addrm, uint16 cmd_of
 		}
 		return i0_attr_byte_len[i0_attr_ue];
 	}
-	if (reg >= 0)
+	if (reg != -1)
 	{
 		operand.reg = (uint16)reg;
 		if (i0_oper_addrm == i0_addrm_Indir)
 		{
-			operand.type = i0_o_regdir;
+			operand.type = i0_o_reg_indir;
 			return i0_attr_byte_len[i0_attr_ue];
 		}
 		else
 		{
-			operand.type = i0_o_regdispl;
+			operand.type = i0_o_reg_displ;
 			operand.value = (int64)(disp);
 			return i0_attr_byte_len[i0_attr_uf] + i0_attr_byte_len[i0_attr_ue];
 		}
@@ -306,8 +313,8 @@ i0_ana(void)
 	uint32 oper4_addrm;
 	uint32 oper5_addrm;
 	cmd.i0_ins_flags = 0;
-	cmd.i0_ins_attr_pref = (uchar)0xcc;
-	cmd.i0_ins_opt_pref = (uchar)0xcc;
+	cmd.i0_ins_attr_pref = (uint8)0xcc;
+	cmd.i0_ins_opt_pref = (uint8)0xcc;
 	uint32 opcode = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_OPCODE);
 	uint32 i0_opt;
 	switch (opcode)
@@ -373,7 +380,7 @@ i0_ana(void)
 		cmd.itype = I0_ins_exit;
 		curr_i0_ins.load(I0_INS_LEN_EXIT);
 		cmd.i0_ins_flags |= i0_ins_spec_option;
-		cmd.i0_ins_opt_pref = (uchar)(i0_ins_opt_pref_exit_c + curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_OPT_EXIT));
+		cmd.i0_ins_opt_pref = (uint8)(i0_ins_opt_pref_exit_c + curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_OPT_EXIT));
 		return cmd.size;
 	case I0_OPCODE_B:
 		i0_opt = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_OPT_B);
@@ -429,7 +436,7 @@ i0_ana(void)
 			curr_i0_ins.load(I0_INS_LEN_BCMP);
 			cmd.i0_ins_flags |= (i0_ins_spec_attr_suffix | i0_ins_spec_option);
 			CHK_I0_ATTR(oper_attr = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ATTR));
-			cmd.i0_ins_attr_pref = (uchar)oper_attr;
+			cmd.i0_ins_attr_pref = (uint8)oper_attr;
 			CHK_I0_ADDRM(oper1_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
 			CHK_I0_ADDRM(oper2_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
 			fill_oper(oper_attr, oper1_addrm, cmd.size, false, cmd.Op1);
@@ -446,7 +453,7 @@ i0_ana(void)
 			curr_i0_ins.load(I0_INS_LEN_BZNZ);
 			cmd.i0_ins_flags |= (i0_ins_spec_attr_suffix | i0_ins_spec_option);
 			CHK_I0_ATTR(oper_attr = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ATTR));
-			cmd.i0_ins_attr_pref = (uchar)oper_attr;
+			cmd.i0_ins_attr_pref = (uint8)oper_attr;
 			CHK_I0_ADDRM(oper1_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
 			fill_oper(oper_attr, oper1_addrm, cmd.size, false, cmd.Op1);
 			fill_oper(i0_attr_ue, i0_addrm_Imm, cmd.size, true, cmd.Op2);
@@ -475,7 +482,7 @@ i0_ana(void)
 		cmd.i0_ins_flags |= i0_ins_spec_attr_suffix;
 		cmd.itype = (uint16)(I0_ins_shl + i0_opt);
 		CHK_I0_ATTR(oper_attr = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ATTR));
-		cmd.i0_ins_attr_pref = (uchar)oper_attr;
+		cmd.i0_ins_attr_pref = (uint8)oper_attr;
 		CHK_I0_ADDRM(oper1_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
 		CHK_I0_ADDRM(oper2_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
 		CHK_I0_ADDRM_M(oper3_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
@@ -498,6 +505,7 @@ i0_ana(void)
 		fill_oper(i0_attr_ue, oper5_addrm, cmd.size, false, cmd.Op5);
 		return cmd.size;
 	default:
+		msg("[i0] unknown instruction: op=%X", opcode);
 		return 0;
 	}
 	//only alu instructions fall here!
@@ -513,7 +521,7 @@ i0_ana(void)
 		cmd.i0_ins_flags |= i0_ins_spec_attr_suffix;
 		curr_i0_ins.load(I0_INS_LEN_ALU);
 		CHK_I0_ATTR(oper_attr = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ATTR));
-		cmd.i0_ins_attr_pref = (uchar)oper_attr;
+		cmd.i0_ins_attr_pref = (uint8)oper_attr;
 		CHK_I0_ADDRM(oper1_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
 		CHK_I0_ADDRM(oper2_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
 		CHK_I0_ADDRM_M(oper3_addrm = curr_i0_ins.fetch_bit(I0_INS_BIT_LEN_ADDRM));
@@ -541,9 +549,9 @@ bool idaapi i0_cmp_opnd(const op_t& op1, const op_t& op2)
 			return (op1.addr == op2.addr);
 		case i0_o_dir_code:
 			return (op1.value == op2.value);
-		case i0_o_regdir:
+		case i0_o_reg_indir:
 			return (op1.reg == op2.reg);
-		case i0_o_regdispl:
+		case i0_o_reg_displ:
 			return ((op1.reg == op2.reg) && (op1.value == op2.value));
 		case i0_o_mem_indir:
 			return (op1.addr == op2.addr);

@@ -13,8 +13,10 @@
 #define I0_OPCODE_CONV		(0x21U)
 #define I0_OPCODE_INT		(0x24U)
 #define I0_OPCODE_SPAWN		(0x25U)
+#define I0_OPCODE_SPAWNX	(0x29U)
 #define I0_OPCODE_SHIFT		(0x27U)
 #define I0_OPCODE_SCMP		(0x2aU)
+#define I0_OPCODE_GREP		(0x30U)
 #define I0_OPCODE_EXIT		(0x86U)
 
 #define I0_OPT_JUMP_R		(0x01U)

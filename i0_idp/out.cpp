@@ -172,7 +172,7 @@ static bool idaapi i0_outop(op_t& op, bool is_ui)
 	bool ret_status = true;
 	switch (op.type)
 	{
-	case i0_o_regdispl:
+	case i0_o_reg_displ:
 	case i0_o_mem_displ:
 		if (is_ui){ ret_status = (ret_status && i0_out_imm_ui_se(op)); }
 		else{ ret_status = (ret_status && i0_out_imm_console_se(op)); }
@@ -182,8 +182,8 @@ static bool idaapi i0_outop(op_t& op, bool is_ui)
 	else{ msg("("); }
 	switch (op.type)
 	{
-	case i0_o_regdispl:
-	case i0_o_regdir:
+	case i0_o_reg_displ:
+	case i0_o_reg_indir:
 		if (is_ui){ i0_output_reg_name_ui(op); }
 		else{ i0_output_reg_name_console(op); }
 		break;

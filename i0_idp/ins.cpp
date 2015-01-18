@@ -3,7 +3,7 @@
 const char* i0_RegNames[] = {
 	"BP", "SP", "R2", "R3",
 	"R4", "R5", "R6", "R7",
-	"CS", "DS",
+	/*
 	"l0_stdin",
 	"l0_stdout",
 	"TaskWpr_sp",
@@ -11,7 +11,7 @@ const char* i0_RegNames[] = {
 	"rr_StkBase",
 	"rr_StkLen",
 	"rr_fi",
-	"rr_ID"
+	"rr_ID"*/
 }; static_assert((qnumber(i0_RegNames) == i0_reg_I0_regs_last), "i0 reg number illegal");
 const size_t i0_number_of_register = qnumber(i0_RegNames);
 
@@ -63,6 +63,7 @@ instruc_t i0_Instructions[] = {
 	{ "shl", CF_USE1 | CF_USE2 | CF_CHG3 | CF_SHFT },
 	{ "shr", CF_USE1 | CF_USE2 | CF_CHG3 | CF_SHFT },
 	{ "scmp", CF_USE1 | CF_USE2 | CF_USE3 | CF_USE4 | CF_CHG5 },
+	{ "grep", CF_USE1 | CF_USE2 | CF_USE3 | CF_USE4 | CF_CHG5 },
 	{ "mov", CF_USE1 | CF_CHG2 },
 }; static_assert((qnumber(i0_Instructions) == I0_ins_last_ins), "i0 ins number illegal");
 
@@ -87,6 +88,7 @@ unsigned i0_Ins_Opnd_Cnt[] =
 	1, //int
 	3, //shl
 	3, //shr
-	4, //scmp
+	5, //scmp
+	5, //grep
 	2, //mov
 }; static_assert((qnumber(i0_Ins_Opnd_Cnt) == I0_ins_last_ins), "i0 ins opt number illegal");
