@@ -54,7 +54,7 @@ public:
 		I0OperandI* ret = new I0OperandI(I0_ATTR_UE);
 		if (ra == I0_OPT_JUMP_R)
 		{
-			ret->value.ue + ip + cmd.size;
+			ret->value.ue += (ip + cmd.size);
 		}
 	}
 	inline I0OperandI(uint8 _Attr) : I0OperandD(_Attr, I0_oper_types::i0_opertype_I)
