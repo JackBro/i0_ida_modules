@@ -214,14 +214,3 @@ processor_t LPH =
 	NULL,
 	0
 };
-
-#include <Windows.h>
-
-BOOL WINAPI I064_DllMain(
-	_In_  HINSTANCE hinstDLL,
-	_In_  DWORD fdwReason,
-	_In_  LPVOID lpvReserved
-	)
-{
-	return TRUE;
-}

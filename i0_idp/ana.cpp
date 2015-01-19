@@ -10,7 +10,8 @@ static bool trans_to_i0_reg(uint64 addr, uint16& reg)
 		&& (addr <= I0_MEMSPACE_REGFILE_LIMIT) 
 		&& (!(addr % sizeof(uint64))))
 	{
-		reg = i0_reg_BP + (((unsigned)(addr - I0_MEMSPACE_REGFILE_BASE)) / 8U);
+		reg = i0_reg_BP + (((uint16)(addr - I0_MEMSPACE_REGFILE_BASE)) / 8U);
+		return true;
 	}
 	/*
 	switch (addr)
@@ -71,10 +72,15 @@ i0_ana_internal(void)
 #else
 i0_ana(void)
 #endif
-{
+try{
+	//__debugbreak();
 	std::unique_ptr<I0Instruction> i0_ins(I0Instruction::Create(cmd.ea));
 	i0_ins->Serialize();
 	return cmd.size;
+}
+catch (...)
+{
+	return 0;
 }
 
 bool idaapi i0_cmp_opnd(const op_t& op1, const op_t& op2)

@@ -15,17 +15,17 @@ typedef std::unique_ptr<I0OperandI> I0OperI;
 
 class I0OperandD{
 private:
-	const uint16 offset;
+	uint16 offset;
 public:
 	inline I0OperandD(uint8 _Attr, I0_oper_types _OperType)
 		: OperType(_OperType), Attr(static_cast<i0_oper_attr>(_Attr)), offset(cmd.size)
 	{}
 	const I0_oper_types OperType;
-	const i0_oper_attr Attr;
+	i0_oper_attr Attr;
 	static inline I0OperandD* Create(uint8 A, uint8 addrm);
 	virtual ~I0OperandD() = 0
 	{}
-	virtual inline void Serialize(bool is_code_ref, op_t& operand)
+	virtual inline void Serialize(bool, op_t& operand)
 	{
 		operand.offb = (int8)offset;
 		operand.dtyp = i0_attr_to_ida_type[Attr];
@@ -116,7 +116,7 @@ public:
 
 class I0OperandMAbs : public I0OperandM{
 public:
-	const uint64 addr;
+	uint64 addr;
 	inline I0OperandMAbs(uint8 _Attr)
 		: I0OperandM(_Attr, I0_oper_types::i0_opertype_MAbs), addr(ua_next_qword())
 	{}
@@ -137,7 +137,7 @@ public:
 
 class I0OperandMIndir : public I0OperandM{
 public:
-	const uint64 addr;
+	uint64 addr;
 	inline I0OperandMIndir(uint8 _Attr)
 		: I0OperandM(_Attr, I0_oper_types::i0_opertype_MIndir), addr(ua_next_qword())
 	{}
@@ -158,8 +158,8 @@ public:
 
 class I0OperandMDisp : public I0OperandM{
 public:
-	const int32 disp;
-	const uint64 addr;
+	int32 disp;
+	uint64 addr;
 	inline I0OperandMDisp(uint8 _Attr) 
 		: I0OperandM(_Attr, I0_oper_types::i0_opertype_MDisp), disp(ua_next_long()), addr(ua_next_qword())
 	{}
@@ -214,7 +214,7 @@ inline I0OperandM* I0OperandM::Create(uint8 A, uint8 addrm)
 class I0Instruction{
 public:
 	const I0_ins_types type;
-	const uint64 addr;
+	uint64 addr;
 protected:
 	union Load{
 		struct{
