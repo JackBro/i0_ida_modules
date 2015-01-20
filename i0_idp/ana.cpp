@@ -73,7 +73,6 @@ i0_ana_internal(void)
 i0_ana(void)
 #endif
 try{
-	//__debugbreak();
 	std::unique_ptr<I0Instruction> i0_ins(I0Instruction::Create(cmd.ea));
 	i0_ins->Serialize();
 	return cmd.size;
