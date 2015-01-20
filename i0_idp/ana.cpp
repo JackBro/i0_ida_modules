@@ -78,8 +78,9 @@ try{
 	i0_ins->Serialize();
 	return cmd.size;
 }
-catch (...)
+catch (const char* err)
 {
+	msg("i0_ana: %011llx %s\n", cmd.ea, err);
 	return 0;
 }
 

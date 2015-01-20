@@ -1,5 +1,9 @@
 #include <memory>
 
+#pragma warning(push)
+#pragma warning(disable:4512)
+#pragma warning(disable:4201)
+
 #pragma pack(push, 1)
 
 class I0OperandD;
@@ -80,7 +84,7 @@ public:
 		case I0_ATTR_US:
 		case I0_ATTR_SS:
 		default:
-			throw __LINE__;// ::std::runtime_error("attr is not valid");
+			throw "attr is not valid";
 		}
 	}
 	virtual inline void Serialize(bool is_code_ref, op_t& operand)
@@ -192,7 +196,7 @@ inline I0OperandD* I0OperandD::Create(uint8 A, uint8 addrm)
 	case I0_ADDRM_DISPLACEMENT:
 		return (new I0OperandMDisp(A));
 	default:
-		throw __LINE__;// std::runtime_error("addrm not implemented");
+		throw "addrm not implemented";
 	}
 }
 
@@ -207,7 +211,7 @@ inline I0OperandM* I0OperandM::Create(uint8 A, uint8 addrm)
 	case I0_ADDRM_DISPLACEMENT:
 		return (new I0OperandMDisp(A));
 	default:
-		throw __LINE__;// std::runtime_error("addrm is not valid");
+		throw "addrm is not valid";
 	}
 }
 
@@ -667,7 +671,7 @@ public:
 			insname = I0_ins_shr;
 			break;
 		default:
-			throw __LINE__;// std::runtime_error("invalid shift option");
+			throw "invalid shift option";
 		}
 		src1.reset(I0OperandD::Create(load.A, load.addrm1));
 		src2.reset(I0OperandI::Create(I0_ATTR_UE)); //according to i0 spec
@@ -755,7 +759,7 @@ inline I0BranchInstruction* I0BranchInstruction::Create(uint16 _lowbytes, uint64
 	case I0_OPT_B_NZ:
 		return new I0BznzInstruction(_lowbytes, _addr, I0_ins_bnz);
 	default:
-		throw __LINE__;// std::runtime_error("branch type not supported");
+		throw "branch type not supported";
 	}
 }
 
@@ -801,9 +805,10 @@ inline I0Instruction* I0Instruction::Create(uint64 _addr)
 	case I0_OPCODE_GREP:
 		return new I0StrInstruction(load.lowbytes, _addr, I0_ins_grep);
 	default:
-		throw __LINE__;// std::runtime_error("invalid instruction");
+		throw "invalid instruction";
 	}
 }
 
 #pragma pack(pop)
+#pragma warning(pop)
 
