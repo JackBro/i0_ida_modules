@@ -40,6 +40,7 @@
 #define I0_INS_LEN_CONV		(0x04U)
 #define I0_INS_LEN_ALU		(0x03U)
 #define I0_INS_LEN_SPAWN	(0x03U)
+#define I0_INS_LEN_SPAWNX	(0x04U)
 #define I0_INS_LEN_EXIT		(0x02U)
 #define I0_INS_LEN_BIJ		(0x03U)
 #define I0_INS_LEN_BJ		(0x02U)
@@ -48,8 +49,10 @@
 #define I0_INS_LEN_NOP		(0x02U)
 #define I0_INS_LEN_INT		(0x02U)
 #define I0_INS_LEN_SHIFT	(0x04U)
+#define I0_INS_LEN_STR		(0x04U)
 #define I0_INS_LEN_SCMP		(0x04U)
 #define I0_INS_LEN_OPCODE	(0x02U)
+#define I0_INS_LEN_BOPCODE	(0x02U)
 
 #define I0_INS_BIT_LEN_OPCODE			(0x0bU)
 #define I0_INS_BIT_LEN_OPT_EXIT			(0x02U)

@@ -73,8 +73,9 @@ i0_ana_internal(void)
 i0_ana(void)
 #endif
 try{
-	std::unique_ptr<I0Instruction> i0_ins(I0Instruction::Create(cmd.ea));
-	i0_ins->Serialize();
+	uint64 ea = cmd.ea;
+	std::unique_ptr<I0Instruction> i0_ins(I0Instruction::Create(ea));
+	i0_ins->Serialize(cmd);
 	return cmd.size;
 }
 catch (const char* err)

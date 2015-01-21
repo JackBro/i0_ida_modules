@@ -56,6 +56,7 @@ instruc_t i0_Instructions[] = {
 	{ "bnz", CF_USE1 | CF_USE2 | CF_JUMP },
 	{ "bj", CF_USE1 | CF_JUMP | CF_STOP },
 	{ "bij", CF_USE1 | CF_JUMP | CF_STOP },
+	{ "bjr", CF_USE1 | CF_CALL },
 	{ "nop", 0 },
 	{ "int", 0 },
 	{ "shl", CF_USE1 | CF_USE2 | CF_CHG3 | CF_SHFT },
@@ -87,6 +88,7 @@ unsigned i0_Ins_Opnd_Cnt[] =
 	2, //bnz
 	1, //bj
 	1, //bij
+	1, //bjr
 	0, //nop
 	1, //int
 	3, //shl

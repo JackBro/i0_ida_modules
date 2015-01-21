@@ -1,4 +1,5 @@
 #include <memory>
+#include <algorithm>
 
 #pragma warning(push)
 #pragma warning(disable:4512)
@@ -18,20 +19,20 @@ typedef std::unique_ptr<I0OperandM> I0OperM;
 typedef std::unique_ptr<I0OperandI> I0OperI;
 
 class I0OperandD{
-private:
-	uint16 offset;
 public:
-	inline I0OperandD(uint8 _Attr, I0_oper_types _OperType)
-		: OperType(_OperType), Attr(static_cast<i0_oper_attr>(_Attr)), offset(cmd.size)
+	inline I0OperandD(uint64 _Addr, uint8 _Attr, I0_oper_types _OperType)
+		: OperType(_OperType), Addr(_Addr), Attr(static_cast<i0_oper_attr>(_Attr))
 	{}
 	const I0_oper_types OperType;
+	uint64 Addr;
 	i0_oper_attr Attr;
-	static inline I0OperandD* Create(uint8 A, uint8 addrm);
+	static inline I0OperandD* Create(uint64& addr, uint8 A, uint8 addrm);
 	virtual ~I0OperandD() = 0
 	{}
-	virtual inline void Serialize(bool, op_t& operand)
+	virtual uint16 Size() const = 0;
+	virtual inline void Serialize(bool, op_t& operand, insn_t& ins)
 	{
-		operand.offb = (int8)offset;
+		operand.offb = (uint8)(Addr - ins.ea);
 		operand.dtyp = i0_attr_to_ida_type[Attr];
 		operand.i0_op_spec_attr = Attr;
 	}
@@ -50,36 +51,36 @@ private:
 		float fs;
 	}value;
 public:
-	inline static I0OperandI* Create(uint8 A)
+	inline static I0OperandI* Create(uint64& addr, uint8 A)
 	{
-		return new I0OperandI(A);
+		return static_cast<I0OperandI*>(I0OperandD::Create(addr, A, I0_ADDRM_IMMEDIATE));
 	}
-	inline static I0OperandI* CreateBranchTarget(uint32 ra, uint64 ip)
+	inline static I0OperandI* CreateBranchTarget(uint64& addr, uint32 ra)
 	{
-		I0OperandI* ret = new I0OperandI(I0_ATTR_UE);
+		I0OperandI* ret = Create(addr, I0_ATTR_UE);
 		if (ra == I0_OPT_JUMP_R)
 		{
-			ret->value.ue += (ip + cmd.size);
+			ret->value.ue += addr;
 		}
 		return ret;
 	}
-	inline I0OperandI(uint8 _Attr) : I0OperandD(_Attr, I0_oper_types::i0_opertype_I)
+	inline I0OperandI(uint64 _Addr, uint8 _Attr) : I0OperandD(_Addr, _Attr, I0_oper_types::i0_opertype_I)
 	{
 		switch (Attr)
 		{
 		case I0_ATTR_UB:
 		case I0_ATTR_SB:
-			value.ub = ua_next_byte();
+			value.ub = get_byte(Addr);
 			break;
 		case I0_ATTR_UF:
 		case I0_ATTR_SF:
 		case I0_ATTR_FS:
-			value.uf = ua_next_long();
+			value.uf = get_long(Addr);
 			break;
 		case I0_ATTR_UE:
 		case I0_ATTR_SE:
 		case I0_ATTR_FD:
-			value.ue = ua_next_qword();
+			value.ue = get_qword(Addr);
 			break;
 		case I0_ATTR_US:
 		case I0_ATTR_SS:
@@ -87,9 +88,13 @@ public:
 			throw "attr is not valid";
 		}
 	}
-	virtual inline void Serialize(bool is_code_ref, op_t& operand)
+	virtual inline uint16 Size() const
 	{
-		I0OperandD::Serialize(is_code_ref, operand);
+		return i0_attr_byte_len[Attr];
+	}
+	virtual inline void Serialize(bool is_code_ref, op_t& operand, insn_t& ins)
+	{
+		I0OperandD::Serialize(is_code_ref, operand, ins);
 		operand.i0_op_spec_addrm = i0_addrm_Imm;
 		if (is_code_ref)
 		{
@@ -107,146 +112,201 @@ public:
 
 class I0OperandM : public I0OperandD{
 public:
-	inline I0OperandM(uint8 _Attr, I0_oper_types _OperType) : I0OperandD(_Attr, _OperType)
+	inline I0OperandM(uint64 _Addr, uint8 _Attr, I0_oper_types _OperType) : I0OperandD(_Addr, _Attr, _OperType)
 	{}
-	static inline I0OperandM* Create(uint8 A, uint8 addrm);
+	static inline I0OperandM* Create(uint64& _addr, uint8 A, uint8 addrm);
 	virtual ~I0OperandM() = 0
 	{}
-	virtual inline void Serialize(bool is_code_ref, op_t& operand)
+	virtual inline void Serialize(bool is_code_ref, op_t& operand, insn_t& ins)
 	{
-		I0OperandD::Serialize(is_code_ref, operand);
+		I0OperandD::Serialize(is_code_ref, operand, ins);
 	}
 };
 
 class I0OperandMAbs : public I0OperandM{
 public:
-	uint64 addr;
-	inline I0OperandMAbs(uint8 _Attr)
-		: I0OperandM(_Attr, I0_oper_types::i0_opertype_MAbs), addr(ua_next_qword())
-	{}
-	virtual inline void Serialize(bool is_code_ref, op_t& operand)
+	uint64 M;
+	inline I0OperandMAbs(uint64 _Addr, uint8 _Attr)
+		: I0OperandM(_Addr, _Attr, I0_oper_types::i0_opertype_MAbs)
 	{
-		I0OperandM::Serialize(is_code_ref, operand);
-		if (trans_to_i0_reg(addr, operand.reg))
+		M = get_qword(Addr);
+	}
+	virtual inline void Serialize(bool is_code_ref, op_t& operand, insn_t& ins)
+	{
+		I0OperandM::Serialize(is_code_ref, operand, ins);
+		if (trans_to_i0_reg(M, operand.reg))
 		{
 			operand.type = i0_o_reg;
 		}
 		else
 		{
-			operand.addr = addr;
+			operand.addr = M;
 			operand.type = i0_o_dir;
 		}
+	}
+	virtual inline uint16 Size() const{
+		return sizeof(uint64);
 	}
 };
 
 class I0OperandMIndir : public I0OperandM{
 public:
-	uint64 addr;
-	inline I0OperandMIndir(uint8 _Attr)
-		: I0OperandM(_Attr, I0_oper_types::i0_opertype_MIndir), addr(ua_next_qword())
-	{}
-	virtual inline void Serialize(bool is_code_ref, op_t& operand)
+	uint64 M;
+	inline I0OperandMIndir(uint64 _Addr, uint8 _Attr)
+		: I0OperandM(_Addr, _Attr, I0_oper_types::i0_opertype_MIndir)
 	{
-		I0OperandM::Serialize(is_code_ref, operand);
-		if (trans_to_i0_reg(addr, operand.reg))
+		M = get_qword(Addr);
+	}
+	virtual inline void Serialize(bool is_code_ref, op_t& operand, insn_t& ins)
+	{
+		I0OperandM::Serialize(is_code_ref, operand, ins);
+		if (trans_to_i0_reg(M, operand.reg))
 		{
 			operand.type = i0_o_reg_indir;
 		}
 		else
 		{
-			operand.addr = addr;
+			operand.addr = M;
 			operand.type = i0_o_mem_indir;
 		}
+	}
+	virtual inline uint16 Size() const{
+		return sizeof(uint64);
 	}
 };
 
 class I0OperandMDisp : public I0OperandM{
 public:
-	int32 disp;
-	uint64 addr;
-	inline I0OperandMDisp(uint8 _Attr) 
-		: I0OperandM(_Attr, I0_oper_types::i0_opertype_MDisp), disp(ua_next_long()), addr(ua_next_qword())
-	{}
-	virtual inline void Serialize(bool is_code_ref, op_t& operand)
+	int32 Disp;
+	uint64 M;
+	inline I0OperandMDisp(uint64 _Addr, uint8 _Attr)
+		: I0OperandM(_Addr, _Attr, I0_oper_types::i0_opertype_MDisp)
 	{
-		I0OperandM::Serialize(is_code_ref, operand);
-		operand.value = (int64)disp;
-		if (trans_to_i0_reg(addr, operand.reg))
+		Disp = get_long(Addr);
+		M = get_qword(Addr);
+	}
+	virtual inline void Serialize(bool is_code_ref, op_t& operand, insn_t& ins)
+	{
+		I0OperandM::Serialize(is_code_ref, operand, ins);
+		operand.value = (int64)Disp;
+		if (trans_to_i0_reg(M, operand.reg))
 		{
 			operand.type = i0_o_reg_displ;
 		}
 		else
 		{
-			operand.addr = addr;
+			operand.addr = M;
 			operand.type = i0_o_mem_displ;
 		}
 	}
+	virtual inline uint16 Size() const{
+		return sizeof(uint64) + sizeof(int32);
+	}
 };
 
-inline I0OperandD* I0OperandD::Create(uint8 A, uint8 addrm)
+inline I0OperandD* I0OperandD::Create(uint64& addr, uint8 A, uint8 addrm)
 {
+	I0OperandD* ret;
 	switch (addrm)
 	{
 	case I0_ADDRM_IMMEDIATE:
-		return (new I0OperandI(A));
+		ret = (new I0OperandI(addr, A));
+		break;
 	case I0_ADDRM_ABSOLUTE:
-		return (new I0OperandMAbs(A));
+		ret = (new I0OperandMAbs(addr, A));
+		break;
 	case I0_ADDRM_INDIRECT:
-		return (new I0OperandMIndir(A));
+		ret = (new I0OperandMIndir(addr, A));
+		break;
 	case I0_ADDRM_DISPLACEMENT:
-		return (new I0OperandMDisp(A));
+		ret = (new I0OperandMDisp(addr, A));
+		break;
 	default:
 		throw "addrm not implemented";
 	}
+	addr += ret->Size();
+	return ret;
 }
 
-inline I0OperandM* I0OperandM::Create(uint8 A, uint8 addrm)
+inline I0OperandM* I0OperandM::Create(uint64& addr, uint8 A, uint8 addrm)
 {
+	I0OperandM* ret;
 	switch (addrm)
 	{
 	case I0_ADDRM_ABSOLUTE:
-		return (new I0OperandMAbs(A));
+		ret = (new I0OperandMAbs(addr, A));
+		break;
 	case I0_ADDRM_INDIRECT:
-		return (new I0OperandMIndir(A));
+		ret = (new I0OperandMIndir(addr, A));
+		break;
 	case I0_ADDRM_DISPLACEMENT:
-		return (new I0OperandMDisp(A));
+		ret = (new I0OperandMDisp(addr, A));
+		break;
 	default:
 		throw "addrm is not valid";
 	}
+	addr += ret->Size();
+	return ret;
+}
+
+template<size_t N>
+void ua_i0_ins_bytes(uint8(&arr)[N], uint64& _Addr)
+{
+	std::generate(
+		std::reverse_iterator<uint8*>(arr + N - 1),
+		std::reverse_iterator<uint8*>(arr - 1),
+		[&]{return get_byte(_Addr++); }
+	);
+}
+
+template<size_t N>
+void get_i0_ins_bytes(uint8(&arr)[N], uint64 _Addr)
+{
+	std::generate(
+		std::reverse_iterator<uint8*>(arr + N - 1),
+		std::reverse_iterator<uint8*>(arr - 1),
+		[&]{return get_byte(_Addr++); }
+	);
 }
 
 class I0Instruction{
 public:
-	const I0_ins_types type;
-	uint64 addr;
+	const I0_ins_types Type;
+	uint64 Addr;
 protected:
 	union Load{
 		struct{
 		uint32: 5;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte1;
-			uint8 byte0;
-		};
-		uint16 lowbytes;
+		uint8 bytes[I0_INS_LEN_OPCODE];
 	};
-	inline I0Instruction(I0_ins_types _type, uint64 _addr) : type(_type), addr(_addr) {}
+	inline I0Instruction(I0_ins_types _Type, uint64 _Addr) : Type(_Type), Addr(_Addr) 
+	{}
 public:
-	static inline I0Instruction* Create(uint64 _addr);
-	virtual void Serialize() = 0;
+	static inline I0Instruction* Create(uint64& addr);
+	void Serialize(insn_t& ins)
+	{
+		ins.ea = Addr;
+		_Serialize(ins);
+	}
+	virtual void _Serialize(insn_t& ins) = 0;
+	virtual uint16 Size() const = 0;
 	virtual ~I0Instruction() = 0
 	{}
 };
 
 class I0NopInstruction : public I0Instruction{
 public:
-	inline I0NopInstruction(uint64 _addr)
-		:I0Instruction(I0_ins_types::i0_instype_nop, _addr)
+	inline I0NopInstruction(uint64& _Addr)
+		:I0Instruction(I0_ins_types::i0_instype_nop, _Addr)
 	{}
-	virtual inline void Serialize()
+	virtual inline void _Serialize(insn_t& ins)
 	{
-		cmd.itype = I0_ins_nop;
+		ins.itype = I0_ins_nop;
+	}
+	virtual inline uint16 Size() const{
+		return I0_INS_LEN_NOP;
 	}
 };
 
@@ -261,48 +321,46 @@ private:
 			uint32 A1 : 4;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte3;
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_CONV];
 	}load;
 	I0OperD src;
 	I0OperM dest;
 public:
-	inline I0ConvInstruction(uint16 _lowbytes, uint64 _addr)
-		:I0Instruction(I0_ins_types::i0_instype_conv, _addr)
+	inline I0ConvInstruction(uint64& _Addr)
+		:I0Instruction(I0_ins_types::i0_instype_conv, _Addr)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		load.byte3 = ua_next_byte();
-		src.reset(I0OperandD::Create(load.A1, load.addrm1));
-		dest.reset(I0OperandM::Create(load.A2, load.addrm2));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		src.reset(I0OperandD::Create(_Addr, load.A1, load.addrm1));
+		dest.reset(I0OperandM::Create(_Addr, load.A2, load.addrm2));
 	}
-	virtual inline void Serialize(){
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_CONV + src->Size() + dest->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
 		bool push_ret = false;
 		if (src->Attr == dest->Attr){
-			cmd.itype = I0_ins_mov;
-			cmd.i0_ins_flags |= i0_ins_spec_attr_suffix;
-			cmd.i0_ins_attr_pref = src->Attr;
+			ins.itype = I0_ins_mov;
+			ins.i0_ins_flags |= i0_ins_spec_attr_suffix;
+			ins.i0_ins_attr_pref = src->Attr;
 			if (dest->OperType == I0_oper_types::i0_opertype_MDisp)
 			{
 				I0OperandMDisp* dest_disp = static_cast<I0OperandMDisp*>(dest.get());
 				if (src->OperType == I0_oper_types::i0_opertype_I &&
-					dest_disp->Attr == i0_attr_ue &&
-					dest_disp->addr == I0_MEMSPACE_REGFILE_SP &&
-					dest_disp->disp == 0)
+					dest_disp->Attr == i0_attr_se &&
+					dest_disp->Addr == I0_MEMSPACE_REGFILE_SP &&
+					dest_disp->Disp == 0)
 				{
 					push_ret = true;
 				}
 			}
 		}
 		else{
-			cmd.itype = I0_ins_conv;
-			cmd.i0_ins_flags |= i0_ins_spec_attr_each_opnd;
+			ins.itype = I0_ins_conv;
+			ins.i0_ins_flags |= i0_ins_spec_attr_each_opnd;
 		}
-		src->Serialize(push_ret, cmd.Op1);
-		dest->Serialize(false, cmd.Op2);
+		src->Serialize(push_ret, ins.Op1, ins);
+		dest->Serialize(false, ins.Op2, ins);
 	}
 };
 
@@ -317,31 +375,31 @@ private:
 			uint32 A : 4;
 			uint32 opcode : 11;
 		};
-		struct {
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_ALU];
 	}load;
 	I0OperD src1;
 	I0OperD src2;
 	I0OperM dest;
 public:
-	inline I0ArithLogicInstruction(uint16 _lowbytes, uint64 _addr, i0_ins_names _insname)
-		:I0Instruction(I0_ins_types::i0_instype_arithlogic, _addr), insname(_insname)
+	inline I0ArithLogicInstruction(uint64& _Addr, i0_ins_names _insname)
+		:I0Instruction(I0_ins_types::i0_instype_arithlogic, _Addr), insname(_insname)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		src1.reset(I0OperandD::Create(load.A, load.addrm1));
-		src2.reset(I0OperandD::Create(load.A, load.addrm2));
-		dest.reset(I0OperandM::Create(load.A, load.addrm3));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		src1.reset(I0OperandD::Create(_Addr, load.A, load.addrm1));
+		src2.reset(I0OperandD::Create(_Addr, load.A, load.addrm2));
+		dest.reset(I0OperandM::Create(_Addr, load.A, load.addrm3));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = insname;
-		cmd.i0_ins_flags |= i0_ins_spec_attr_suffix;
-		cmd.i0_ins_attr_pref = dest->Attr;
-		src1->Serialize(false, cmd.Op1);
-		src2->Serialize(false, cmd.Op2);
-		dest->Serialize(false, cmd.Op3);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_ALU + src1->Size() + src2->Size() + dest->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = insname;
+		ins.i0_ins_flags |= i0_ins_spec_attr_suffix;
+		ins.i0_ins_attr_pref = dest->Attr;
+		src1->Serialize(false, ins.Op1, ins);
+		src2->Serialize(false, ins.Op2, ins);
+		dest->Serialize(false, ins.Op3, ins);
 	}
 };
 
@@ -356,32 +414,32 @@ private:
 			uint32 addrm1 : 3;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_SPAWN];
 	}load;
 	I0OperM stack;
 	I0OperM use;
 	I0OperM watch;
 	I0OperM entry;
 public:
-	inline I0SpawnInstruction(uint16 _lowbytes, uint64 _addr)
-		:I0Instruction(I0_ins_types::i0_instype_spawn, _addr)
+	inline I0SpawnInstruction(uint64& _Addr)
+		:I0Instruction(I0_ins_types::i0_instype_spawn, _Addr)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		stack.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm1));
-		use.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm2));
-		watch.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm3));
-		entry.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm4));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		stack.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm1));
+		use.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm2));
+		watch.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm3));
+		entry.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm4));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = I0_ins_spawn;
-		stack->Serialize(false, cmd.Op1);
-		use->Serialize(false, cmd.Op2);
-		watch->Serialize(false, cmd.Op3);
-		entry->Serialize(false, cmd.Op4);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_SPAWN + stack->Size() + use->Size() + watch->Size() + entry->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = I0_ins_spawn;
+		stack->Serialize(false, ins.Op1, ins);
+		use->Serialize(false, ins.Op2, ins);
+		watch->Serialize(false, ins.Op3, ins);
+		entry->Serialize(false, ins.Op4, ins);
 	}
 };
 
@@ -397,11 +455,7 @@ private:
 			uint32 addrm1 : 3;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte3;
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_SPAWNX];
 	}load;
 	I0OperM stack;
 	I0OperM use;
@@ -409,25 +463,27 @@ private:
 	I0OperM entry;
 	I0OperM space;
 public:
-	inline I0SpawnXInstruction(uint16 _lowbytes, uint64 _addr)
-		:I0Instruction(I0_ins_types::i0_instype_spawnx, _addr)
+	inline I0SpawnXInstruction(uint64& _Addr)
+		:I0Instruction(I0_ins_types::i0_instype_spawnx, _Addr)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		load.byte3 = ua_next_byte();
-		stack.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm1));
-		use.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm2));
-		watch.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm3));
-		entry.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm4));
-		space.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm5));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		stack.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm1));
+		use.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm2));
+		watch.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm3));
+		entry.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm4));
+		space.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm5));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = I0_ins_spawnx;
-		stack->Serialize(false, cmd.Op1);
-		use->Serialize(false, cmd.Op2);
-		watch->Serialize(false, cmd.Op3);
-		entry->Serialize(false, cmd.Op4);
-		space->Serialize(false, cmd.Op5);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_SPAWNX + stack->Size() + use->Size() + watch->Size() + entry->Size() + space->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = I0_ins_spawnx;
+		stack->Serialize(false, ins.Op1, ins);
+		use->Serialize(false, ins.Op2, ins);
+		watch->Serialize(false, ins.Op3, ins);
+		entry->Serialize(false, ins.Op4, ins);
+		space->Serialize(false, ins.Op5, ins);
 	}
 };
 
@@ -439,30 +495,34 @@ private:
 			uint32 option : 2;
 			uint32 opcode : 11;
 		};
-		uint16 lowbytes;
+		uint8 bytes[I0_INS_LEN_EXIT];
 	}load;
 public:
-	inline I0ExitInstruciton(uint16 _lowbytes, uint64 _addr)
-		:I0Instruction(I0_ins_types::i0_instype_exit, _addr)
+	inline I0ExitInstruciton(uint64& _Addr)
+		:I0Instruction(I0_ins_types::i0_instype_exit, _Addr)
 	{
-		load.lowbytes = _lowbytes;
+		ua_i0_ins_bytes(load.bytes, _Addr);
 	}
-	virtual inline void Serialize(){
-		cmd.itype = I0_ins_exit;
-		cmd.i0_ins_flags |= i0_ins_spec_option;
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_EXIT;
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = I0_ins_exit;
+		ins.i0_ins_flags |= i0_ins_spec_option;
 		switch (load.option)
 		{
 		case I0_OPT_EXIT_C:
-			cmd.i0_ins_opt_pref = i0_ins_opt_pref_exit_c;
+			ins.i0_ins_opt_pref = i0_ins_opt_pref_exit_c;
 			break;
 		case I0_OPT_EXIT_CD:
-			cmd.i0_ins_opt_pref = i0_ins_opt_pref_exit_cd;
+			ins.i0_ins_opt_pref = i0_ins_opt_pref_exit_cd;
 			break;
 		case I0_OPT_EXIT_A:
-			cmd.i0_ins_opt_pref = i0_ins_opt_pref_exit_a;
+			ins.i0_ins_opt_pref = i0_ins_opt_pref_exit_a;
 			break;
 		case I0_OPT_EXIT_AD:
-			cmd.i0_ins_opt_pref = i0_ins_opt_pref_exit_ad;
+			ins.i0_ins_opt_pref = i0_ins_opt_pref_exit_ad;
 			break;
 		}
 	}
@@ -476,13 +536,13 @@ protected:
 			uint32 mode : 4;
 			uint32 opcode : 11;
 		};
-		uint16 lowbytes;
+		uint8 bytes[I0_INS_LEN_BOPCODE];
 	};
 public:
-	inline I0BranchInstruction(I0_ins_types _type, uint64 _addr)
-		:I0Instruction(_type, _addr)
+	inline I0BranchInstruction(I0_ins_types _type, uint64& _Addr)
+		:I0Instruction(_type, _Addr)
 	{}
-	static inline I0BranchInstruction* Create(uint16 _lowbytes, uint64 _addr);
+	static inline I0BranchInstruction* Create(uint64& _Addr);
 };
 
 class I0BijInstruction : public I0BranchInstruction{
@@ -494,23 +554,23 @@ private:
 			uint32 mode : 4;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_BIJ];
 	}load;
 	I0OperM target;
 public:
-	inline I0BijInstruction(uint16 _lowbytes, uint64 _addr)
-		:I0BranchInstruction(I0_ins_types::i0_instype_bij, _addr)
+	inline I0BijInstruction(uint64& _Addr)
+		:I0BranchInstruction(I0_ins_types::i0_instype_bij, _Addr)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		target.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		target.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = I0_ins_bij;
-		target->Serialize(true, cmd.Op1);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_BIJ + target->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = I0_ins_bij;
+		target->Serialize(true, ins.Op1, ins);
 	}
 };
 
@@ -522,19 +582,23 @@ private:
 			uint32 mode : 4;
 			uint32 opcode : 11;
 		};
-		uint16 lowbytes;
+		uint8 bytes[I0_INS_LEN_BJ];
 	}load;
 	I0OperI target;
 public:
-	inline I0BjInstruction(uint16 _lowbytes, uint64 _addr)
-		:I0BranchInstruction(I0_ins_types::i0_instype_bj, _addr)
+	inline I0BjInstruction(uint64& _Addr)
+		:I0BranchInstruction(I0_ins_types::i0_instype_bj, _Addr)
 	{
-		load.lowbytes = _lowbytes;
-		target.reset(I0OperandI::CreateBranchTarget(load.ra, addr));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		target.reset(I0OperandI::CreateBranchTarget(_Addr, load.ra));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = I0_ins_bj;
-		target->Serialize(true, cmd.Op1);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_BJ + target->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = I0_ins_bj;
+		target->Serialize(true, ins.Op1, ins);
 	}
 };
 
@@ -551,33 +615,31 @@ private:
 			uint32 mode : 4;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte3;
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_BCMP];
 	}load;
 	I0OperD op1;
 	I0OperD op2;
 	I0OperI target;
 public:
-	inline I0BccInstruction(uint16 _lowbytes, uint64 _addr, i0_ins_names _insname)
-		:I0BranchInstruction(I0_ins_types::i0_instype_bcc, _addr), insname(_insname)
+	inline I0BccInstruction(uint64& _Addr, i0_ins_names _insname)
+		:I0BranchInstruction(I0_ins_types::i0_instype_bcc, _Addr), insname(_insname)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		load.byte3 = ua_next_byte();
-		op1.reset(I0OperandD::Create(load.A, load.addrm1));
-		op2.reset(I0OperandD::Create(load.A, load.addrm2));
-		target.reset(I0OperandI::CreateBranchTarget(load.ra, addr));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		op1.reset(I0OperandD::Create(_Addr, load.A, load.addrm1));
+		op2.reset(I0OperandD::Create(_Addr, load.A, load.addrm2));
+		target.reset(I0OperandI::CreateBranchTarget(_Addr, load.ra));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = insname;
-		cmd.i0_ins_flags |= i0_ins_spec_attr_suffix;
-		cmd.i0_ins_attr_pref = op1->Attr;
-		op1->Serialize(false, cmd.Op1);
-		op2->Serialize(false, cmd.Op2);
-		target->Serialize(true, cmd.Op3);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_BCMP + op1->Size() + op2->Size() + target->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = insname;
+		ins.i0_ins_flags |= i0_ins_spec_attr_suffix;
+		ins.i0_ins_attr_pref = op1->Attr;
+		op1->Serialize(false, ins.Op1, ins);
+		op2->Serialize(false, ins.Op2, ins);
+		target->Serialize(true, ins.Op3, ins);
 	}
 };
 
@@ -593,28 +655,28 @@ private:
 			uint32 mode : 4;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_BZNZ];
 	}load;
 	I0OperD op;
 	I0OperI target;
 public:
-	inline I0BznzInstruction(uint16 _lowbytes, uint64 _addr, i0_ins_names _insname)
-		:I0BranchInstruction(I0_ins_types::i0_instype_bznz, _addr), insname(_insname)
+	inline I0BznzInstruction(uint64& _Addr, i0_ins_names _insname)
+		:I0BranchInstruction(I0_ins_types::i0_instype_bznz, _Addr), insname(_insname)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		op.reset(I0OperandD::Create(load.A, load.addrm1));
-		target.reset(I0OperandI::CreateBranchTarget(load.ra, addr));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		op.reset(I0OperandD::Create(_Addr, load.A, load.addrm1));
+		target.reset(I0OperandI::CreateBranchTarget(_Addr, load.ra));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = insname;
-		cmd.i0_ins_flags |= i0_ins_spec_attr_suffix;
-		cmd.i0_ins_attr_pref = op->Attr;
-		op->Serialize(false, cmd.Op1);
-		target->Serialize(true, cmd.Op2);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_BCMP + op->Size() + target->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = insname;
+		ins.i0_ins_flags |= i0_ins_spec_attr_suffix;
+		ins.i0_ins_attr_pref = op->Attr;
+		op->Serialize(false, ins.Op1, ins);
+		target->Serialize(true, ins.Op2, ins);
 	}
 };
 
@@ -622,14 +684,19 @@ class I0IntInstruction : public I0Instruction{
 private:
 	I0OperI intno;
 public:
-	inline I0IntInstruction(uint64 _addr)
-		:I0Instruction(I0_ins_types::i0_instype_int, _addr)
+	inline I0IntInstruction(uint64& _Addr)
+		:I0Instruction(I0_ins_types::i0_instype_int, _Addr)
 	{
-		intno.reset(I0OperandI::Create(I0_ATTR_UB));
+		_Addr += 2;
+		intno.reset(I0OperandI::Create(_Addr, I0_ATTR_UB));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = I0_ins_int;
-		intno->Serialize(false, cmd.Op1);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_INT + intno->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = I0_ins_int;
+		intno->Serialize(false, ins.Op1, ins);
 	}
 };
 
@@ -646,22 +713,16 @@ private:
 			uint32 option : 2;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte3;
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_SHIFT];
 	}load;
 	I0OperD src1;
 	I0OperI src2;
 	I0OperM dest;
 public:
-	inline I0ShiftInstruction(uint16 _lowbytes, uint64 _addr)
-		:I0Instruction(I0_ins_types::i0_instype_shift, _addr)
+	inline I0ShiftInstruction(uint64& _Addr)
+		:I0Instruction(I0_ins_types::i0_instype_shift, _Addr)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		load.byte3 = ua_next_byte();
+		ua_i0_ins_bytes(load.bytes, _Addr);
 		switch (load.option)
 		{
 		case I0_OPT_SHIFT_L:
@@ -673,17 +734,21 @@ public:
 		default:
 			throw "invalid shift option";
 		}
-		src1.reset(I0OperandD::Create(load.A, load.addrm1));
-		src2.reset(I0OperandI::Create(I0_ATTR_UE)); //according to i0 spec
-		dest.reset(I0OperandM::Create(load.A, load.addrm3));
+		src1.reset(I0OperandD::Create(_Addr, load.A, load.addrm1));
+		src2.reset(I0OperandI::Create(_Addr, I0_ATTR_UE)); //according to i0 spec
+		dest.reset(I0OperandM::Create(_Addr, load.A, load.addrm3));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = insname;
-		cmd.i0_ins_flags |= i0_ins_spec_attr_suffix;
-		cmd.i0_ins_attr_pref = src1->Attr;
-		src1->Serialize(false, cmd.Op1);
-		src2->Serialize(false, cmd.Op2);
-		dest->Serialize(false, cmd.Op3);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_SHIFT + src1->Size() + src2->Size() + dest->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = insname;
+		ins.i0_ins_flags |= i0_ins_spec_attr_suffix;
+		ins.i0_ins_attr_pref = src1->Attr;
+		src1->Serialize(false, ins.Op1, ins);
+		src2->Serialize(false, ins.Op2, ins);
+		dest->Serialize(false, ins.Op3, ins);
 	}
 };
 
@@ -700,11 +765,7 @@ private:
 			uint32 addrm1 : 3;
 			uint32 opcode : 11;
 		};
-		struct{
-			uint8 byte3;
-			uint8 byte2;
-			uint16 lowbytes;
-		};
+		uint8 bytes[I0_INS_LEN_STR];
 	}load;
 	I0OperM str1;
 	I0OperD len1;
@@ -712,98 +773,99 @@ private:
 	I0OperD len2;
 	I0OperM dest;
 public:
-	inline I0StrInstruction(uint16 _lowbytes, uint64 _addr, i0_ins_names _insname)
-		:I0Instruction(I0_ins_types::i0_instype_scmp, _addr), insname(_insname)
+	inline I0StrInstruction(uint64& _Addr, i0_ins_names _insname)
+		:I0Instruction(I0_ins_types::i0_instype_scmp, _Addr), insname(_insname)
 	{
-		load.lowbytes = _lowbytes;
-		load.byte2 = ua_next_byte();
-		load.byte3 = ua_next_byte();
-		str1.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm1));
-		len1.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm2));
-		str2.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm3));
-		len2.reset(I0OperandM::Create(I0_ATTR_UE, load.addrm4));
-		dest.reset(I0OperandM::Create(I0_ATTR_SE, load.addrm5));
+		ua_i0_ins_bytes(load.bytes, _Addr);
+		str1.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm1));
+		len1.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm2));
+		str2.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm3));
+		len2.reset(I0OperandM::Create(_Addr, I0_ATTR_UE, load.addrm4));
+		dest.reset(I0OperandM::Create(_Addr, I0_ATTR_SE, load.addrm5));
 	}
-	virtual inline void Serialize(){
-		cmd.itype = insname;
-		str1->Serialize(false, cmd.Op1);
-		len1->Serialize(false, cmd.Op2);
-		str2->Serialize(false, cmd.Op3);
-		len2->Serialize(false, cmd.Op4);
-		dest->Serialize(false, cmd.Op5);
+	virtual inline uint16 Size() const
+	{
+		return I0_INS_LEN_STR + str1->Size() + len1->Size() + str2->Size() + len2->Size() + dest->Size();
+	}
+	virtual inline void _Serialize(insn_t& ins){
+		ins.itype = insname;
+		str1->Serialize(false, ins.Op1, ins);
+		len1->Serialize(false, ins.Op2, ins);
+		str2->Serialize(false, ins.Op3, ins);
+		len2->Serialize(false, ins.Op4, ins);
+		dest->Serialize(false, ins.Op5, ins);
 	}
 };
 
-inline I0BranchInstruction* I0BranchInstruction::Create(uint16 _lowbytes, uint64 _addr)
+inline I0BranchInstruction* I0BranchInstruction::Create(uint64& _Addr)
 {
 	Load load;
-	load.lowbytes = _lowbytes;
+	get_i0_ins_bytes(load.bytes, _Addr);
 	switch (load.mode)
 	{
 	case I0_OPT_B_IJ:
-		return new I0BijInstruction(_lowbytes, _addr);
+		return new I0BijInstruction(_Addr);
 	case I0_OPT_B_J:
-		return new I0BjInstruction(_lowbytes, _addr);
+		return new I0BjInstruction(_Addr);
 	case I0_OPT_B_LE:
-		return new I0BccInstruction(_lowbytes, _addr, I0_ins_ble);
+		return new I0BccInstruction(_Addr, I0_ins_ble);
 	case I0_OPT_B_E:
-		return new I0BccInstruction(_lowbytes, _addr, I0_ins_be);
+		return new I0BccInstruction(_Addr, I0_ins_be);
 	case I0_OPT_B_L:
-		return new I0BccInstruction(_lowbytes, _addr, I0_ins_bl);
+		return new I0BccInstruction(_Addr, I0_ins_bl);
 	case I0_OPT_B_NE:
-		return new I0BccInstruction(_lowbytes, _addr, I0_ins_bne);
+		return new I0BccInstruction(_Addr, I0_ins_bne);
 	case I0_OPT_B_SL:
-		return new I0BccInstruction(_lowbytes, _addr, I0_ins_bsl);
+		return new I0BccInstruction(_Addr, I0_ins_bsl);
 	case I0_OPT_B_Z:
-		return new I0BznzInstruction(_lowbytes, _addr, I0_ins_bz);
+		return new I0BznzInstruction(_Addr, I0_ins_bz);
 	case I0_OPT_B_NZ:
-		return new I0BznzInstruction(_lowbytes, _addr, I0_ins_bnz);
+		return new I0BznzInstruction(_Addr, I0_ins_bnz);
 	default:
 		throw "branch type not supported";
 	}
 }
 
-inline I0Instruction* I0Instruction::Create(uint64 _addr)
+inline I0Instruction* I0Instruction::Create(uint64& _Addr)
 {
 	Load load;
-	load.byte0 = ua_next_byte();
-	load.byte1 = ua_next_byte();
+	get_i0_ins_bytes(load.bytes, _Addr);
 	switch (load.opcode)
 	{
 	case I0_OPCODE_ADD:
-		return new I0ArithLogicInstruction(load.lowbytes, _addr, I0_ins_add);
+		return new I0ArithLogicInstruction(_Addr, I0_ins_add);
 	case I0_OPCODE_SUB:
-		return new I0ArithLogicInstruction(load.lowbytes, _addr, I0_ins_sub);
+		return new I0ArithLogicInstruction(_Addr, I0_ins_sub);
 	case I0_OPCODE_MUL:
-		return new I0ArithLogicInstruction(load.lowbytes, _addr, I0_ins_mul);
+		return new I0ArithLogicInstruction(_Addr, I0_ins_mul);
 	case I0_OPCODE_DIV:
-		return new I0ArithLogicInstruction(load.lowbytes, _addr, I0_ins_div);
+		return new I0ArithLogicInstruction(_Addr, I0_ins_div);
 	case I0_OPCODE_OR:
-		return new I0ArithLogicInstruction(load.lowbytes, _addr, I0_ins_or);
+		return new I0ArithLogicInstruction(_Addr, I0_ins_or);
 	case I0_OPCODE_XOR:
-		return new I0ArithLogicInstruction(load.lowbytes, _addr, I0_ins_xor);
+		return new I0ArithLogicInstruction(_Addr, I0_ins_xor);
 	case I0_OPCODE_AND:
-		return new I0ArithLogicInstruction(load.lowbytes, _addr, I0_ins_and);
+		return new I0ArithLogicInstruction(_Addr, I0_ins_and);
 	case I0_OPCODE_CONV:
-		return new I0ConvInstruction(load.lowbytes, _addr);
+		return new I0ConvInstruction(_Addr);
 	case I0_OPCODE_SPAWN:
-		return new I0SpawnInstruction(load.lowbytes, _addr);
+		return new I0SpawnInstruction(_Addr);
 	case I0_OPCODE_SPAWNX:
-		return new I0SpawnXInstruction(load.lowbytes, _addr);
+		return new I0SpawnXInstruction(_Addr);
 	case I0_OPCODE_NOP:
-		return new I0NopInstruction(_addr);
+		return new I0NopInstruction(_Addr);
 	case I0_OPCODE_EXIT:
-		return new I0ExitInstruciton(load.lowbytes, _addr);
+		return new I0ExitInstruciton(_Addr);
 	case I0_OPCODE_B:
-		return I0BranchInstruction::Create(load.lowbytes, _addr);
+		return I0BranchInstruction::Create(_Addr);
 	case I0_OPCODE_INT:
-		return new I0IntInstruction(_addr);
+		return new I0IntInstruction(_Addr);
 	case I0_OPCODE_SHIFT:
-		return new I0ShiftInstruction(load.lowbytes, _addr);
+		return new I0ShiftInstruction(_Addr);
 	case I0_OPCODE_SCMP:
-		return new I0StrInstruction(load.lowbytes, _addr, I0_ins_scmp);
+		return new I0StrInstruction(_Addr, I0_ins_scmp);
 	case I0_OPCODE_GREP:
-		return new I0StrInstruction(load.lowbytes, _addr, I0_ins_grep);
+		return new I0StrInstruction(_Addr, I0_ins_grep);
 	default:
 		throw "invalid instruction";
 	}

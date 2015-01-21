@@ -63,6 +63,7 @@ enum i0_ins_names : uint16
 		I0_ins_bnz,
 		I0_ins_bj,
 		I0_ins_bij,
+		I0_ins_bjr,
 		I0_ins_nop,
 		I0_ins_int,
 		I0_ins_shl,
