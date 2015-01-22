@@ -252,21 +252,19 @@ inline I0OperandM* I0OperandM::Create(uint64& addr, uint8 A, uint8 addrm)
 template<size_t N>
 void ua_i0_ins_bytes(uint8(&arr)[N], uint64& _Addr)
 {
-	std::generate(
-		std::reverse_iterator<uint8*>(arr + N - 1),
-		std::reverse_iterator<uint8*>(arr - 1),
-		[&]{return get_byte(_Addr++); }
-	);
+	for (size_t i = N; i > 0; --i)
+	{
+		arr[i - 1] = get_byte(_Addr++);
+	}
 }
 
 template<size_t N>
 void get_i0_ins_bytes(uint8(&arr)[N], uint64 _Addr)
 {
-	std::generate(
-		std::reverse_iterator<uint8*>(arr + N - 1),
-		std::reverse_iterator<uint8*>(arr - 1),
-		[&]{return get_byte(_Addr++); }
-	);
+	for (size_t i = N; i > 0; --i)
+	{
+		arr[i - 1] = get_byte(_Addr++);
+	}
 }
 
 class I0Instruction{
@@ -289,6 +287,7 @@ public:
 	{
 		ins.ea = Addr;
 		_Serialize(ins);
+		ins.size = Size();
 	}
 	virtual void _Serialize(insn_t& ins) = 0;
 	virtual uint16 Size() const = 0;
